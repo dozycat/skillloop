@@ -277,3 +277,21 @@ def test_cli_json_output_is_clean_and_review_paths_are_cwd_relative(tmp_path, ca
     monkeypatch.chdir(d)
     main(["review", "export", "sheet.csv"])
     assert (d / "sheet.csv").exists()
+
+
+def test_cli_reset_keeps_inputs_and_optionally_the_cache(tmp_path, capsys):
+    d = tmp_path / "demo"
+    main(["init", str(d), "--demo"])
+    main(["evolve", "-p", str(d), "-n", "1", "-q"])
+    assert (d / ".skillloop" / "cache").exists() and (d / "outputs").exists()
+    with pytest.raises(SystemExit, match="--yes"):  # never deletes without confirmation
+        main(["reset", "-p", str(d)])
+    assert (d / ".skillloop" / "versions").exists()
+    main(["reset", "-p", str(d), "--yes", "--keep-cache"])
+    assert not (d / ".skillloop" / "versions").exists() and not (d / "outputs").exists()
+    assert any((d / ".skillloop" / "cache").rglob("*.json"))
+    assert (d / "dataset.jsonl").exists() and (d / "seed_skill" / "SKILL.md").exists()
+    main(["reset", "-p", str(d), "-y"])
+    assert not (d / ".skillloop").exists()
+    main(["evolve", "-p", str(d), "-n", "1", "-q"])  # the project still works afterwards
+    assert "Best version" in capsys.readouterr().out

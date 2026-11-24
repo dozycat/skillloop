@@ -16,8 +16,40 @@ _EXPECTED_KEYS = ("expected", "answer", "ground_truth", "gold", "output", "label
 _KNOWN = {"id", "rubric", "tags", "split", "files", "meta", "weight", "judge", *_INPUT_KEYS, *_EXPECTED_KEYS}
 
 
-def case_from_record(rec: dict[str, Any], index: int = 0) -> Case:
-    """Build a Case from a loosely-shaped record (common field aliases are accepted)."""
+def _apply_columns(rec: dict[str, Any], columns: Any, index: int) -> dict[str, Any]:
+    """Rename configured columns ([dataset] section) to the canonical field names."""
+    out = dict(rec)
+    for field_name, column in (
+        ("input", columns.input_column),
+        ("expected", columns.expected_column),
+        ("id", columns.id_column),
+        ("rubric", columns.rubric_column),
+    ):
+        if not column:
+            continue
+        if column not in rec:
+            raise ValueError(f"record {index} has no column {column!r} (configured as the {field_name} column)")
+        for alias in _INPUT_KEYS if field_name == "input" else _EXPECTED_KEYS if field_name == "expected" else ():
+            out.pop(alias, None)  # an explicit mapping beats the aliases
+        out.pop(column, None)
+        out[field_name] = rec[column]
+    tags = out.get("tags") or []
+    if isinstance(tags, str):
+        tags = [t.strip() for t in tags.replace(";", ",").split(",") if t.strip()]
+    for column in columns.tag_columns:
+        value = str(rec.get(column, "") or "").strip()
+        if value and value not in tags:
+            tags = [*tags, value]
+    if tags:
+        out["tags"] = tags
+    return out
+
+
+def case_from_record(rec: dict[str, Any], index: int = 0, columns: Any = None) -> Case:
+    """Build a Case from a loosely-shaped record (common field aliases are accepted; ``columns`` is an
+    optional ``DatasetSection`` naming non-standard columns)."""
+    if columns is not None:
+        rec = _apply_columns(rec, columns, index)
     inp = next((rec[k] for k in _INPUT_KEYS if rec.get(k) not in (None, "")), None)
     if inp is None:
         raise ValueError(f"record {index} has no input field (one of {', '.join(_INPUT_KEYS)})")
@@ -42,8 +74,8 @@ def case_from_record(rec: dict[str, Any], index: int = 0) -> Case:
     )
 
 
-def load_cases(path: str | Path) -> list[Case]:
-    """Load cases from .jsonl, .json (list or {"cases": [...]}) or .csv."""
+def load_cases(path: str | Path, columns: Any = None) -> list[Case]:
+    """Load cases from .jsonl, .json (list or {"cases": [...]}), .csv or .tsv."""
     p = Path(path)
     if not p.exists():
         return []
@@ -58,7 +90,7 @@ def load_cases(path: str | Path) -> list[Case]:
             records = list(csv.DictReader(f, delimiter="\t" if suffix == ".tsv" else ","))
     else:
         raise ValueError(f"unsupported dataset format: {p.name} (use .jsonl, .json, .csv)")
-    cases = [case_from_record(r, i) for i, r in enumerate(records)]
+    cases = [case_from_record(r, i, columns) for i, r in enumerate(records)]
     seen: dict[str, int] = {}
     for c in cases:  # make ids unique
         n = seen.get(c.id, 0)
@@ -70,6 +102,11 @@ def load_cases(path: str | Path) -> list[Case]:
 
 def save_cases(cases: Iterable[Case], path: str | Path) -> Path:
     p = Path(path)
+    if p.suffix.lower() != ".jsonl":
+        raise ValueError(
+            f"cases can only be written to a .jsonl dataset, not {p.name}: convert it once "
+            "(load it and save as .jsonl) and point [project] dataset at the new file"
+        )
     p.parent.mkdir(parents=True, exist_ok=True)
     with p.open("w", encoding="utf-8") as f:
         for c in cases:

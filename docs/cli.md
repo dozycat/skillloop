@@ -39,6 +39,7 @@ skillloop doctor -p my-skill
 | `devset` | 从需求文档生成测试集(规则抽取 → 候选生成 → 场景演化 → 过滤 → 平衡 → 报告) | `--merge` 把结果追加进项目测试集;`-q` |
 | `bootstrap` | 只做第一步:登记初版 Skill,没有则由需求文档生成 | — |
 | `outputs` | 重新生成输出包(`<project>/outputs/`) | — |
+| `reset` | 删除项目的运行结果(版本、评测、错题库、日志、输出),保留输入和配置 | `-y, --yes` 不询问直接删;`--keep-cache` 保留已缓存的 agent 运行,重跑时不再花钱 |
 
 ```bash
 skillloop evolve -p my-skill -n 5

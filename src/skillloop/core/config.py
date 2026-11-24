@@ -34,12 +34,32 @@ class ProjectSection(Serializable):
 
 
 @dataclass
+class DatasetSection(Serializable):
+    """How to read a tabular dataset whose columns do not use the default names.
+
+    Empty values fall back to the built-in aliases (``input``/``question``/..., ``expected``/``answer``/...)."""
+
+    input_column: str = ""  # column holding the task input
+    expected_column: str = ""  # column holding the expected answer
+    id_column: str = ""  # column holding a stable case id
+    rubric_column: str = ""  # column holding per-case acceptance criteria
+    tag_columns: list[str] = field(default_factory=list)  # columns whose values become tags (first one stratifies)
+
+
+@dataclass
 class AgentSection(Serializable):
     """The agent system under test. ``adapter`` is a registry name or ``"pkg.module:Class"``."""
 
     adapter: str = "mock"
     options: dict[str, Any] = field(default_factory=dict)
     mcp_profile: str = ""  # name under [mcp_profiles] to attach as mock MCP servers
+    # Fixed task framing given to the agent with every case (a file inside the project). It is NOT evolved:
+    # put here what is true of the job regardless of the skill - role, where the reference material is,
+    # the required answer format. May contain "{input}" to control where the case input goes.
+    task_file: str = ""
+    # Project directories of reference material (a document corpus, a code base) made available read-only
+    # inside every case's working directory, under their own name. Shared, never copied.
+    data_dirs: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -58,6 +78,13 @@ class EvalSection(Serializable):
     judge_options: dict[str, Any] = field(default_factory=dict)
     judges: dict[str, dict[str, Any]] = field(default_factory=dict)  # options for per-case judge overrides, by name
     trials: int = 1  # repeats per case (variance control)
+    max_retries: int = 0  # re-run a case whose agent errored or timed out (not counted as extra trials)
+    # Reuse a finished agent run when the same skill content, case, prompt, adapter settings and trial come up
+    # again - an interrupted evaluation resumes where it stopped. Judging is always redone.
+    cache: bool = True
+    # Regex locating the final answer inside the agent's reply (last match; group 1 if present). Judges then
+    # see only that. Pair it with an answer-format line in the task file, e.g. r"FINAL ANSWER:\s*(.+)".
+    answer_regex: str = ""
     concurrency: int = 4
     timeout_s: float = 600.0
     pass_threshold: float = 0.7  # score >= threshold counts as pass for graded judges
@@ -71,6 +98,7 @@ class EvolveSection(Serializable):
     patience: int = 3  # stop after this many iterations without promotion
     target_score: float = 1.0  # stop once the best val score reaches this
     frontier_size: int = 3
+    max_cost_usd: float = 0.0  # stop once agent runs of this evolve call cost this much (0 = no limit)
     train_ratio: float = 0.5
     val_ratio: float = 0.3  # remainder is the held-out test split
     split_seed: int = 7
@@ -82,6 +110,10 @@ class EvolveSection(Serializable):
     metric: str = "mean_score"  # "mean_score" | "pass_rate"
     min_delta: float = 0.01  # required val improvement over the current best
     max_regressions: int = 1  # cases passing under best that may fail under the candidate
+    # Require (cases fixed - cases regressed) >= this. With a noisy agent and few cases, a score can creep up
+    # by one lucky trial without any case actually changing outcome; 1 demands a real fail -> pass flip.
+    # Leave at 0 for graded judges, where a higher score without a flip is genuine progress.
+    min_net_fixed: int = 0
     protect_tags: list[str] = field(default_factory=list)  # cases with these tags may never regress
     require_human_approval: bool = False
     confirm_on_test: bool = False  # also require no drop on the held-out test split
@@ -105,6 +137,7 @@ class DevsetSection(Serializable):
 @dataclass
 class Config(Serializable):
     project: ProjectSection = field(default_factory=ProjectSection)
+    dataset: DatasetSection = field(default_factory=DatasetSection)
     agent: AgentSection = field(default_factory=AgentSection)
     llm: LLMSection = field(default_factory=LLMSection)
     eval: EvalSection = field(default_factory=EvalSection)
@@ -148,6 +181,15 @@ class Config(Serializable):
             problems.append("evolve.train_ratio / val_ratio must be fractions summing to <= 1")
         if e.metric not in ("mean_score", "pass_rate"):
             problems.append("evolve.metric must be 'mean_score' or 'pass_rate'")
+        if self.eval.answer_regex:
+            import re
+
+            try:
+                re.compile(self.eval.answer_regex)
+            except re.error as err:
+                problems.append(f"eval.answer_regex is not a valid regular expression: {err}")
+        if self.eval.max_retries < 0 or e.max_cost_usd < 0:
+            problems.append("eval.max_retries and evolve.max_cost_usd must be >= 0")
         if self.eval.trials < 1 or self.eval.concurrency < 1:
             problems.append("eval.trials and eval.concurrency must be >= 1")
         return problems

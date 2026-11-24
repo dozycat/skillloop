@@ -174,6 +174,8 @@ class ClaudeCodeAdapter(CommandAdapter):
             cmd += ["--setting-sources", self.setting_sources]
         if self.bare:
             cmd.append("--bare")
+        for d in request.data_dirs:  # the links in the workdir resolve outside it; allow the real locations
+            cmd += ["--add-dir", str(d)]
         if request.mcp_config and request.mcp_config.get("mcpServers"):
             cmd += ["--mcp-config", values["mcp_config_file"]]
         if self.strict_mcp_config:

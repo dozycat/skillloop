@@ -48,6 +48,13 @@ def test_example_inputs_are_well_formed(name):
     cfg = Config.load(root)
     assert cfg.validate() == []
     assert (root / cfg.project.requirement).read_text(encoding="utf-8").strip()
-    cases = load_cases(root / cfg.project.dataset)
-    assert len(cases) >= 12 and len({c.id for c in cases}) == len(cases)
+    assert (root / cfg.project.seed_skill / "SKILL.md").exists()
+    if cfg.agent.task_file:
+        assert (root / cfg.agent.task_file).read_text(encoding="utf-8").strip()
+    dataset = root / cfg.project.dataset
+    if not dataset.exists():  # examples whose data is downloaded on demand ship a fetch script instead
+        assert (root / "fetch_data.py").exists()
+        return
+    cases = load_cases(dataset, cfg.dataset)
+    assert len(cases) >= 10 and len({c.id for c in cases}) == len(cases)
     assert (root / cfg.project.seed_skill / "SKILL.md").exists()

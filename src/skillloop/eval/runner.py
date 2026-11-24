@@ -5,6 +5,10 @@ the CLI, the web console and the MCP server all evaluate in exactly the same way
 
 from __future__ import annotations
 
+import dataclasses
+import hashlib
+import json
+import re
 import shutil
 import threading
 import time
@@ -38,6 +42,11 @@ class Evaluator:
         keep_workdirs: bool = False,
         env: dict[str, str] | None = None,
         case_judge_options: dict[str, dict[str, Any]] | None = None,
+        task_prompt: str = "",
+        data_dirs: list[Path] | None = None,
+        answer_regex: str = "",
+        max_retries: int = 0,
+        cache_dir: str | Path | None = None,
     ):
         self.adapter = adapter
         self.judge = judge
@@ -49,6 +58,12 @@ class Evaluator:
         self.keep_workdirs = keep_workdirs
         self.env = env or {}
         self.case_judge_options = case_judge_options or {}
+        self.task_prompt = task_prompt.strip()
+        self.data_dirs = [Path(d) for d in (data_dirs or [])]
+        self.answer_regex = re.compile(answer_regex, re.M | re.I) if answer_regex else None
+        self.max_retries = max(0, max_retries)
+        self.cache_dir = Path(cache_dir) if cache_dir and adapter.cacheable else None
+        self._adapter_key = adapter.cache_key() if self.cache_dir else ""
         self._case_judges: dict[str, Judge] = {}
         self._lock = threading.Lock()
 
@@ -80,6 +95,11 @@ class Evaluator:
             mcp_config=mcp_config,
             keep_workdirs=cfg.eval.keep_workdirs,
             case_judge_options=cfg.eval.judges,
+            task_prompt=project.load_task(),
+            data_dirs=project.data_dirs(),
+            answer_regex=cfg.eval.answer_regex,
+            max_retries=cfg.eval.max_retries,
+            cache_dir=project.state.mkdir("cache", "runs") if cfg.eval.cache else None,
         )
 
     # ---------------------------------------------------------------- internals
@@ -93,36 +113,132 @@ class Evaluator:
                 )
             return self._case_judges[case.judge]
 
-    def _run_one(
-        self, skill: Skill, case: Case, trial: int, version: str, run_dir: Path, cancel: threading.Event
-    ) -> CaseResult:
-        workdir = run_dir / f"{safe_name(case.id)}_t{trial}"
+    def compose_input(self, case: Case) -> str:
+        """What the agent is actually asked: the fixed task framing, a note about the reference
+        directories, then the case input. The stored Case (and everything analysts see) keeps the bare input."""
+        parts = []
+        task = self.task_prompt
+        if "{input}" in task:
+            task = task.replace("{input}", case.input)
+        if task:
+            parts.append(task)
+        if self.data_dirs:
+            listing = ", ".join(f"./{d.name}/" for d in self.data_dirs)
+            parts.append(f"Reference material is available read-only in your working directory: {listing}")
+        if "{input}" not in self.task_prompt:
+            parts.append(case.input)
+        return "\n\n".join(parts)
+
+    def _prepare(self, workdir: Path, case: Case) -> None:
+        shutil.rmtree(workdir, ignore_errors=True)  # a retry starts from a clean directory
         workdir.mkdir(parents=True, exist_ok=True)
+        for d in self.data_dirs:  # shared corpus: linked, never copied
+            (workdir / d.name).symlink_to(d, target_is_directory=True)
         for rel, content in case.files.items():
             target = safe_join(workdir, rel)
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
-        t0 = time.time()
+
+    def _extract_answer(self, traj: Trajectory) -> bool:
+        """Narrow ``traj.output`` to the final answer located by ``answer_regex``. False when it is absent."""
+        assert self.answer_regex is not None
+        matches = list(self.answer_regex.finditer(traj.output))
+        if not matches:
+            return False
+        m = matches[-1]
+        answer = (m.group(1) if m.groups() and m.group(1) is not None else m.group(0)).strip()
+        traj.full_output, traj.output = traj.output, answer
+        return True
+
+    def _cache_path(self, skill: Skill, asked: Case, trial: int) -> Path | None:
+        if self.cache_dir is None:
+            return None
+        ident = json.dumps(
+            [
+                self._adapter_key,
+                skill.content_hash(),
+                asked.id,
+                asked.input,
+                sorted(asked.files.items()),
+                trial,
+                sorted(d.name for d in self.data_dirs),
+                self.mcp_config,
+            ],
+            sort_keys=True,
+            ensure_ascii=False,
+            default=repr,
+        )
+        digest = hashlib.sha256(ident.encode()).hexdigest()
+        return self.cache_dir / digest[:2] / f"{digest[2:40]}.json"
+
+    @staticmethod
+    def _cache_load(path: Path | None) -> Trajectory | None:
+        if path is None or not path.exists():
+            return None
         try:
-            traj = self.adapter.run(
-                AgentRequest(
-                    case=case,
-                    skill=skill,
-                    workdir=workdir,
-                    timeout_s=self.timeout_s,
-                    cancel=cancel,
-                    env=dict(self.env),
-                    mcp_config=self.mcp_config,
+            traj = Trajectory.from_dict(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, ValueError, TypeError):
+            return None
+        # a reused run costs nothing now; keep the token counts for reference
+        traj.usage = {**traj.usage, "cost_usd": 0.0, "cached": 1}
+        return traj
+
+    @staticmethod
+    def _cache_store(path: Path | None, traj: Trajectory) -> None:
+        if path is None or traj.status != "ok":
+            return
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(traj.to_dict(), ensure_ascii=False), encoding="utf-8")
+            tmp.replace(path)
+        except OSError:
+            pass  # the cache is an optimisation; never fail a run over it
+
+    def _run_one(
+        self, skill: Skill, case: Case, trial: int, version: str, run_dir: Path, cancel: threading.Event
+    ) -> CaseResult:
+        workdir = run_dir / f"{safe_name(case.id)}_t{trial}"
+        asked = dataclasses.replace(case, input=self.compose_input(case))
+        t0 = time.time()
+        attempts = 0
+        cache_path = self._cache_path(skill, asked, trial)
+        cached = self._cache_load(cache_path)
+        while cached is None:
+            attempts += 1
+            self._prepare(workdir, case)
+            try:
+                traj = self.adapter.run(
+                    AgentRequest(
+                        case=asked,
+                        skill=skill,
+                        workdir=workdir,
+                        timeout_s=self.timeout_s,
+                        cancel=cancel,
+                        env=dict(self.env),
+                        mcp_config=self.mcp_config,
+                        data_dirs=list(self.data_dirs),
+                    )
                 )
-            )
-        except Exception as e:  # adapters should not raise, but a broken one must not kill the run
-            traj = Trajectory(status="error", error=f"adapter raised {type(e).__name__}: {e}")
+            except Exception as e:  # adapters should not raise, but a broken one must not kill the run
+                traj = Trajectory(status="error", error=f"adapter raised {type(e).__name__}: {e}")
+            if traj.status not in ("error", "timeout") or attempts > self.max_retries or cancel.is_set():
+                break
+        if cached is not None:
+            traj = cached
+        else:
+            self._cache_store(cache_path, traj)
+            traj.attempts = attempts
         traj.case_id = case.id
-        if not traj.duration_s:
+        if not traj.duration_s or attempts > 1:
             traj.duration_s = time.time() - t0
         if traj.status == "ok":
+            found_answer = self._extract_answer(traj) if self.answer_regex else True
             try:
                 judgment = self._judge_for(case).judge(case, traj)
+                if not found_answer:  # tell analysts the reply ignored the required answer format
+                    judgment.labels.append("no_final_answer")
+                    judgment.reason = (judgment.reason + " (reply has no final-answer line)").strip()
             except Exception as e:
                 judgment = Judgment(
                     score=0.0,

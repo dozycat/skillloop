@@ -56,8 +56,36 @@ skillloop doctor -p my-skill           # is the agent / LLM / config / input rea
 skillloop evolve -p my-skill
 ```
 
-Runnable projects live in [examples/](examples): a real one driven through the local `claude` CLI,
-and a project that ships its own adapter in a single file.
+Runnable projects live in [examples/](examples): a document-QA benchmark sample (OfficeQA) run
+through Claude Code, a policy-calculation task driven through the local `claude` CLI, and a project
+that ships its own adapter in a single file.
+
+### Tasks that need more than a prompt
+
+Real tasks usually come with material and conventions that are not part of the skill:
+
+```toml
+[agent]
+task_file = "task.md"                    # fixed framing and answer format, given with every case
+data_dirs = ["data/treasury_bulletins"]  # a corpus linked read-only into each case's working directory
+
+[dataset]                                # an existing CSV benchmark with its own column names
+input_column = "question"
+expected_column = "answer"
+tag_columns = ["difficulty"]
+
+[eval]
+judge = "answer"                         # "36080 million" == "36,080" == "36.08 billion"
+answer_regex = 'FINAL ANSWER:\s*(.+)'    # judge the final-answer line, not the whole reply
+trials = 3                               # agents are not deterministic; majority of three runs
+max_retries = 1                          # re-run on agent error or timeout
+
+[evolve]
+max_cost_usd = 5.0                       # stop starting iterations past this agent spend
+```
+
+Finished agent runs are cached, so an interrupted evaluation resumes where it stopped and identical
+candidates are never paid for twice.
 
 ## Plugging in your agent
 

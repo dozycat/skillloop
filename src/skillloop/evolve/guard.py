@@ -16,6 +16,7 @@ from ..core.skill import Skill
 
 MIN_LEAK_LEN = 12  # shorter gold answers ("yes", "42") are too generic to flag by substring
 MIN_INPUT_LEAK_LEN = 60
+GROWTH_FLOOR = 2000  # chars; below this size the growth ratio is not meaningful
 
 
 def _norm(s: Any) -> str:
@@ -67,7 +68,9 @@ def check_candidate(candidate: Skill, parent: Skill, cases: list[Case], cfg: Evo
         problems.append("candidate is identical to its parent (no edit applied)")
     if candidate.name != parent.name:
         problems.append(f"skill name changed from {parent.name!r} to {candidate.name!r}")
-    psize = max(parent.size(), 400)
+    # A short seed legitimately grows several-fold when it first gains real content, so the ratio is
+    # measured against a floor: any candidate up to max_growth_ratio x GROWTH_FLOOR chars is fine.
+    psize = max(parent.size(), GROWTH_FLOOR)
     if cfg.max_growth_ratio and candidate.size() > psize * cfg.max_growth_ratio:
         problems.append(
             f"candidate grew {candidate.size() / psize:.1f}x over its parent "

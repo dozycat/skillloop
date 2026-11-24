@@ -23,3 +23,6 @@ examples/*/outputs/
 
 # Local agent tooling
 .claude/settings.local.json
+
+# Scratch project created by `make demo`
+/demo/

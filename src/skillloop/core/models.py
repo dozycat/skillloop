@@ -117,6 +117,8 @@ class Trajectory(Serializable):
     usage: dict[str, float] = field(default_factory=dict)  # input_tokens, output_tokens, cost_usd, turns...
     artifacts: dict[str, str] = field(default_factory=dict)  # relpath -> text of files the agent produced
     raw: str = ""  # raw transcript / stdout, truncated by the adapter
+    full_output: str = ""  # the complete final reply when `output` was narrowed by eval.answer_regex
+    attempts: int = 1  # how many times the case was run (eval.max_retries)
 
     def render(self, max_chars: int = 6000) -> str:
         """Compact human/LLM-readable transcript."""

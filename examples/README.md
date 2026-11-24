@@ -5,6 +5,7 @@ Each directory is a complete skillloop project: inputs are tracked, results (`.s
 | Example | Agent | Framework LLM | Needs | Shows |
 |---|---|---|---|---|
 | [custom-adapter](custom-adapter) | `glossary_agent` (in `my_agent.py`) | simulated | nothing | writing your own adapter as a project-local plugin |
+| [officeqa](officeqa) | Claude Code (`claude_code` adapter) | `claude` CLI | a Claude Code login; `python fetch_data.py` | a document-corpus QA benchmark: shared data directories, CSV column mapping, fixed task prompt, tolerant answer judge, cost limit |
 | [expense-policy](expense-policy) | a model call via the `claude` CLI | `claude` CLI | a working Claude Code login | a real run: analysts diagnosing real failures, held-out confirmation |
 
 ```bash
@@ -23,4 +24,4 @@ There is also a built-in offline demo that needs no files at all: `skillloop ini
   in one or two iterations — it demonstrates the mechanics, not a hard optimisation problem.
 - **custom-adapter** sets `leak_check = false`: a glossary skill legitimately contains the answers.
   Leave the check on for skills that are meant to teach a procedure.
-- To start over, delete the project's `.skillloop/` and `outputs/` directories.
+- To start over: `skillloop reset -p examples/<name>` (add `--keep-cache` to keep finished agent runs).

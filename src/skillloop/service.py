@@ -17,7 +17,7 @@ from .adapters.base import AgentAdapter, build_adapter
 from .core.config import CONFIG_FILE, Config
 from .core.dataset import case_from_record, split_cases
 from .core.jobs import JobContext, JobManager, NullContext
-from .core.models import Case, EvalReport, SkillVersion
+from .core.models import Case, EvalReport, SkillVersion, error_message
 from .core.project import Project
 from .core.sandbox import safe_join
 from .core.skill import Skill
@@ -460,6 +460,13 @@ class SkillLoop:
                 ok, msg = False, f"{type(e).__name__}: {e}"
             out[name] = {"ok": ok, "message": msg}
         out["config_problems"] = self.project.config.validate()
+        input_problems = []
+        for check in (self.project.load_task, self.project.data_dirs, self.project.load_cases):
+            try:
+                check()
+            except Exception as e:
+                input_problems.append(error_message(e))
+        out["input_problems"] = input_problems
         return out
 
     # ---------------------------------------------------------------- config / inputs

@@ -151,8 +151,36 @@ def test_guard_detects_leak_and_bloat():
     assert any("leak" in p for p in check_candidate(leaky, parent, cases, cfg))
     assert any("identical" in p for p in check_candidate(parent.copy(), parent, cases, cfg))
     big = parent.copy()
-    big.body += "x " * 3000
+    big.body += "x " * 6000
     assert any("grew" in p for p in check_candidate(big, parent, cases, cfg))
     ok = parent.copy()
     ok.body += "\n- Verify the order before answering.\n"
     assert check_candidate(ok, parent, cases, cfg) == []
+
+
+def test_gate_min_net_fixed_blocks_noise_promotions():
+    cfg = Config().evolve
+    cfg.min_net_fixed = 1
+    base = _report("v1", {"a": 0.8, "b": 0.33})
+    noisy = _report("v2", {"a": 1.0, "b": 0.33})  # higher mean, but no case changed outcome
+    d = decide(compare_reports(base, noisy), cfg)
+    assert not d.promoted and any("net_fixed" in r for r in d.reasons)
+    real = _report("v3", {"a": 1.0, "b": 1.0})
+    assert decide(compare_reports(base, real), cfg).promoted
+
+
+def test_patch_tidies_headings():
+    from skillloop.evolve.patch import tidy_markdown
+
+    s = Skill("s", "d", "# T\n\nIntro line.\n")
+    r = apply_patch(
+        s,
+        Patch.coerce(
+            {
+                "summary": "x",
+                "edits": [{"op": "append", "content": "## Steps\n1. Do it.\n```sh\n# not a heading\nls\n```"}],
+            }
+        ),
+    )
+    assert "Intro line.\n\n## Steps\n1. Do it." in r.skill.body and "```sh\n# not a heading" in r.skill.body
+    assert tidy_markdown("a\n\n\n\n# b") == "a\n\n# b"

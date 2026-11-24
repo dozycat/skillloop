@@ -20,6 +20,8 @@ skillloop 通过 **适配器(AgentAdapter)** 接入被评测的 agent 系统,通
 | `llm` | 直接调模型(skill 作 system prompt) | system prompt | 单轮回复 |
 | `callable` | 进程内 Python 函数 | 函数自行处理 | 函数返回值 |
 
+所有适配器都能使用 `[agent] task_file`(固定任务说明)和 `[agent] data_dirs`(只读参考目录):前者由评测器拼进交给适配器的输入,后者由评测器链接进用例工作目录,适配器不需要做任何事。agent 自带访问控制时还需要放行真实路径——`claude_code` 已通过 `--add-dir` 处理;其余适配器未对「工作目录内的符号链接指向目录外」做过实测,如果你的 agent 拒绝读取,把真实路径(`request.data_dirs`)通过它自己的参数放行。
+
 ### claude_code
 
 ```toml

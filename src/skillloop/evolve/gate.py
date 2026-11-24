@@ -48,6 +48,14 @@ def decide(
         f"{len(cmp.regressed)} case(s) regressed (allowed {cfg.max_regressions})"
         + (": " + ", ".join(cmp.regressed[:8]) if cmp.regressed else ""),
     )
+    if cfg.min_net_fixed > 0:
+        net = len(cmp.fixed) - len(cmp.regressed)
+        check(
+            "net_fixed",
+            net >= cfg.min_net_fixed,
+            f"{len(cmp.fixed)} fixed - {len(cmp.regressed)} regressed = {net} (need ≥ {cfg.min_net_fixed}); "
+            "a score change without cases changing outcome is treated as noise",
+        )
     if cfg.protect_tags:
         check(
             "protected",

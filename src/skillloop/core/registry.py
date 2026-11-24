@@ -80,7 +80,7 @@ ADAPTERS: Registry = Registry(
         "skillloop.adapters.callable",
     ),
 )
-JUDGES: Registry = Registry("judges", ("skillloop.eval.judges",))
+JUDGES: Registry = Registry("judges", ("skillloop.eval.judges", "skillloop.eval.answer"))
 LLMS: Registry = Registry(
     "llm",
     ("skillloop.llm.mock", "skillloop.llm.anthropic", "skillloop.llm.openai_compat", "skillloop.llm.cli"),

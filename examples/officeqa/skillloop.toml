@@ -1,0 +1,51 @@
+# OfficeQA sample: questions about U.S. Treasury bulletins, answered by an agent that has to find the
+# figure in large source documents. A real run - it needs a working Claude Code login and spends tokens.
+#
+#   python fetch_data.py                      # download the 10-question sample and its 9 documents
+#   skillloop doctor -p examples/officeqa
+#   skillloop evolve -p examples/officeqa
+[project]
+name = "officeqa"
+requirement = "requirement.md"
+seed_skill = "seed_skill"
+dataset = "data/officeqa_sample.csv"
+
+[dataset]                       # the CSV uses its own column names
+id_column = "uid"
+input_column = "question"
+expected_column = "answer"
+tag_columns = ["difficulty"]    # also stratifies the train / val / test split
+
+[agent]
+adapter = "claude_code"
+task_file = "task.md"                       # fixed framing + answer format; not evolved
+data_dirs = ["data/treasury_bulletins"]     # linked into every case's working directory, never copied
+
+[agent.options]
+model = "haiku"
+setting_sources = "project"                 # do not load your personal skills and hooks into the evaluation
+allowed_tools = ["Read", "Grep", "Glob", "Bash", "Skill"]
+max_turns = 40
+
+[llm]                           # analysts and merger, through the local `claude` CLI (no API key needed)
+provider = "cli"
+model = "sonnet"
+
+[eval]
+judge = "answer"                # tolerant numeric / short-text matching
+trials = 3                      # the agent is not deterministic and the sample is tiny: majority of 3 runs
+answer_regex = 'FINAL ANSWER:\s*(.+)'
+concurrency = 2
+timeout_s = 600.0
+max_retries = 1
+
+[evolve]
+max_iterations = 3
+candidates_per_iteration = 2
+patience = 2
+frontier_size = 2
+train_ratio = 0.4               # only 10 questions, so larger shares than the defaults
+val_ratio = 0.2
+analyst_batch_size = 2
+min_net_fixed = 1               # 2 val cases x 3 noisy trials: only promote on a real fail -> pass flip
+max_cost_usd = 6.0              # stop starting new iterations once agent runs have cost this much

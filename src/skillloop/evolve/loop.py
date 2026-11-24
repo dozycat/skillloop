@@ -77,9 +77,12 @@ class EvolutionLoop:
         self.evaluator = evaluator or Evaluator.from_project(project, llm=self.llm, adapter=adapter)
         self.versions = project.versions
         self.errorbook = ErrorBook(project.errorbook_path)
-        self.proposer = Proposer(
-            self.llm, self.cfg, project.load_requirement(), max_workers=max(1, project.config.eval.concurrency)
-        )
+        context = project.load_requirement()
+        task = project.load_task()
+        if task:  # analysts must know the framing the agent was given, or they will re-teach it in the skill
+            context += "\n\n## Fixed task prompt given to the agent with every case (not part of the skill)\n\n" + task
+        self.proposer = Proposer(self.llm, self.cfg, context, max_workers=max(1, project.config.eval.concurrency))
+        self.spent_usd = 0.0  # agent cost of evaluations run by this loop instance
         self.history = load_history(project)
         self.cases: list[Case] = []
         self.splits: dict[str, list[Case]] = {}
@@ -113,6 +116,7 @@ class EvolutionLoop:
         if report.cancelled:
             raise JobCancelled(self.ctx.job_id)
         self.project.save_eval(report)
+        self.spent_usd += float(report.usage().get("cost_usd", 0.0))
         self._enqueue_reviews(report)
         report = self._with_reviews(report)
         fresh = self.versions.record_score(version.id, split, report.summary())
@@ -227,7 +231,12 @@ class EvolutionLoop:
         # 运行评测 + 判分 on train, 错题库
         train_report = self.evaluate(parent, "train")
         record["train_score"] = self._score(train_report.summary())
-        record["errorbook"] = self.errorbook.record_eval(train_report, self.splits["train"], iteration)
+        # The error book describes the best version. A frontier parent that is not the best still gets its
+        # failures analysed below, but folding its results in would mark cases "fixed" that the best version
+        # still fails (and "regressed" again at the end of the run).
+        record["errorbook"] = (
+            self.errorbook.record_eval(train_report, self.splits["train"], iteration) if parent.id == best.id else {}
+        )
         if not train_report.failures():
             record["note"] = "parent passes every train case"
             return record
@@ -405,6 +414,9 @@ class EvolutionLoop:
             best = self.versions.best()
             if self._score(best.scores.get("val")) >= cfg.target_score - 1e-9:  # type: ignore[union-attr]
                 stop = f"target score {cfg.target_score} reached on val"
+                break
+            if cfg.max_cost_usd and self.spent_usd >= cfg.max_cost_usd:
+                stop = f"cost limit reached (${self.spent_usd:.2f} of ${cfg.max_cost_usd:.2f} spent on agent runs)"
                 break
             ctx.progress("iteration", iteration - start, n_iter, f"iteration {iteration}", iteration=iteration)
             record = self.iterate(iteration, stale)

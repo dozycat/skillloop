@@ -54,6 +54,7 @@ class FunctionAdapter(AgentAdapter):
     ``request.cancel`` itself if it runs long (in-process code cannot be killed)."""
 
     name = "function"
+    cacheable = False  # an in-process function has no settings that identify what it does
 
     def __init__(self, fn: AgentFn, **options: Any):
         super().__init__(**options)

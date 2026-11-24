@@ -38,13 +38,29 @@ class AgentRequest:
     env: dict[str, str] = field(default_factory=dict)  # extra environment for subprocess agents
     mcp_config: dict[str, Any] | None = None  # {"mcpServers": {...}} to attach (e.g. mock MCP profiles)
     on_step: Callable[[Step], None] | None = None  # optional live trace callback
+    # Reference directories (absolute paths). The evaluator already links each one into the workdir under
+    # its own name; adapters whose agent has an access-control list should also allow the real paths.
+    data_dirs: list[Path] = field(default_factory=list)
 
 
 class AgentAdapter(ABC):
     name = "agent"
+    cacheable = True  # False for adapters whose behaviour is not determined by their settings
 
     def __init__(self, **options: Any):
         self.options = options
+
+    def cache_key(self) -> str:
+        """Identity of this adapter's configuration for the run cache: two adapters with the same key
+        are expected to behave the same on the same case and skill."""
+        import json
+
+        settings = {k: v for k, v in vars(self).items() if not k.startswith("_") and k != "options"}
+        return json.dumps(
+            [type(self).__qualname__, settings, self.options],
+            sort_keys=True,
+            default=lambda o: type(o).__qualname__,  # objects (clients, patterns) count by type, not address
+        )
 
     @abstractmethod
     def run(self, request: AgentRequest) -> Trajectory: ...

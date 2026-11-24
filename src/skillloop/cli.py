@@ -280,6 +280,10 @@ def cmd_doctor(args: argparse.Namespace) -> None:
             f"{info['n_cases']} cases" + ("" if info["n_cases"] >= 4 else " (need a few to split train/val)"),
         ),
     ]
+    cfg = es.project.config.agent
+    if cfg.task_file or cfg.data_dirs or h["input_problems"]:
+        described = ", ".join(filter(None, [cfg.task_file, *cfg.data_dirs])) or "ok"
+        checks.append(("task inputs", not h["input_problems"], "; ".join(h["input_problems"]) or described))
     _out(args, h, "\n".join(f"{'✓' if ok else '✗'} {name:<14} {msg}" for name, ok, msg in checks))
     es.close()
     if not all(ok for _, ok, _ in checks):
@@ -440,6 +444,40 @@ def cmd_logs(args: argparse.Namespace) -> None:
     es.close()
 
 
+def cmd_reset(args: argparse.Namespace) -> None:
+    """Delete everything a project's runs produced, keeping its inputs and configuration."""
+    import shutil
+
+    root = Path(args.project).resolve()
+    if not (root / CONFIG_FILE).exists():
+        sys.exit(f"error: {root} is not a skillloop project (no {CONFIG_FILE})")
+    state, outputs = root / ".skillloop", root / "outputs"
+    cache = state / "cache"
+    targets = [p for p in (state, outputs) if p.exists()]
+    if not targets:
+        print("nothing to reset")
+        return
+    what = "versions, evaluations, error book, logs" + ("" if args.keep_cache else ", run cache") + ", outputs"
+    if not args.yes:
+        if not sys.stdin.isatty():
+            sys.exit("error: reset deletes run results; pass --yes to confirm in a non-interactive shell")
+        answer = input(f"Delete {what} of {root.name}? Inputs and config are kept. [y/N] ")
+        if answer.strip().lower() not in ("y", "yes"):
+            print("aborted")
+            return
+    kept = None
+    if args.keep_cache and cache.exists():
+        kept = root / ".skillloop-cache-keep"
+        shutil.rmtree(kept, ignore_errors=True)
+        cache.rename(kept)
+    for p in targets:
+        shutil.rmtree(p)
+    if kept is not None:
+        state.mkdir()
+        kept.rename(cache)
+    print(f"reset {root.name}: removed {what}")
+
+
 def cmd_plugins(args: argparse.Namespace) -> None:
     print("agent adapters: " + ", ".join(ADAPTERS.names()))
     print("judges:         " + ", ".join(JUDGES.names()))
@@ -544,6 +582,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=200)
     p.add_argument("--audit", action="store_true", help="only state-changing operations")
     p.add_argument("--all", action="store_true", help="include progress events")
+
+    p = add("reset", cmd_reset, "delete a project's run results (versions, evals, outputs); inputs are kept")
+    p.add_argument("-y", "--yes", action="store_true", help="do not ask for confirmation")
+    p.add_argument("--keep-cache", action="store_true", help="keep cached agent runs so a re-run is cheap")
 
     add("plugins", cmd_plugins, "list registered adapters, judges and LLM providers", project=False)
 

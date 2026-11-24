@@ -59,6 +59,32 @@ skillloop init my-skill --adapter claude_code --llm anthropic --judge llm
 skillloop evolve -p my-skill
 ```
 
+### 不只是一段提示的任务
+
+真实任务通常带着不属于 Skill 的资料和约定:
+
+```toml
+[agent]
+task_file = "task.md"                    # 固定的任务说明与答案格式,随每个用例交给 agent,不参与进化
+data_dirs = ["data/treasury_bulletins"]  # 文档库,只读地链接进每个用例的工作目录,不复制
+
+[dataset]                                # 现成的 CSV 基准,列名自定义
+input_column = "question"
+expected_column = "answer"
+tag_columns = ["difficulty"]
+
+[eval]
+judge = "answer"                         # "36080 million" == "36,080" == "36.08 billion"
+answer_regex = 'FINAL ANSWER:\s*(.+)'    # 只对最终答案那一行判分
+trials = 3                               # agent 输出有随机性,三次取多数
+max_retries = 1                          # agent 报错或超时后重跑
+
+[evolve]
+max_cost_usd = 5.0                       # agent 花费超过该值后不再开始新一轮
+```
+
+已完成的 agent 运行会被缓存:评测中断后续跑只补没完成的用例,内容相同的候选不会重复花钱。完整例子见 [examples/officeqa](examples/officeqa)。
+
 ## 架构
 
 ```

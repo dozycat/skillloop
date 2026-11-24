@@ -125,6 +125,19 @@ def _append_under(body: str, section: str, content: str) -> str:
     return "\n".join(new).rstrip("\n") + "\n"
 
 
+def tidy_markdown(text: str) -> str:
+    """Give every heading a blank line before it (outside fenced code) and collapse runs of blank lines."""
+    out: list[str] = []
+    fenced = False
+    for line in text.split("\n"):
+        if line.lstrip().startswith(("```", "~~~")):
+            fenced = not fenced
+        if not fenced and re.match(r"#{1,6}\s", line) and out and out[-1].strip():
+            out.append("")
+        out.append(line)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out))
+
+
 def apply_patch(skill: Skill, patch: Patch) -> ApplyResult:
     """Apply ``patch`` to a copy of ``skill``. Never raises on bad edits; see ``ApplyResult.rejected``."""
     out = skill.copy()
@@ -199,4 +212,6 @@ def apply_patch(skill: Skill, patch: Patch) -> ApplyResult:
             reject(edit, f"unknown op {op!r}")
             continue
         res.applied.append(edit)
+    if res.applied:
+        out.body = tidy_markdown(out.body)
     return res

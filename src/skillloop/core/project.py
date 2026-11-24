@@ -147,8 +147,31 @@ class Project:
             return Skill.load(p)
         return None
 
+    def load_task(self) -> str:
+        """The fixed task framing from ``[agent] task_file`` ("" when not configured)."""
+        rel = self.config.agent.task_file
+        if not rel:
+            return ""
+        p = self.path(rel)
+        if not p.is_file():
+            raise FileNotFoundError(f"[agent] task_file not found: {rel}")
+        return p.read_text(encoding="utf-8").strip()
+
+    def data_dirs(self) -> list[Path]:
+        """Resolved ``[agent] data_dirs``; each must be an existing directory inside the project."""
+        out = []
+        for rel in self.config.agent.data_dirs:
+            p = self.path(rel)
+            if not p.is_dir():
+                raise FileNotFoundError(f"[agent] data_dirs entry is not a directory: {rel}")
+            out.append(p)
+        names = [p.name for p in out]
+        if len(set(names)) != len(names):
+            raise ValueError(f"[agent] data_dirs must have distinct directory names, got {names}")
+        return out
+
     def load_cases(self) -> list[Case]:
-        return load_cases(self.path(self.config.project.dataset))
+        return load_cases(self.path(self.config.project.dataset), self.config.dataset)
 
     def save_cases(self, cases: list[Case]) -> Path:
         return save_cases(cases, self.path(self.config.project.dataset))
