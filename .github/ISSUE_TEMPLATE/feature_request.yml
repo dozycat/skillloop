@@ -1,0 +1,20 @@
+name: Feature request
+description: An adapter, judge, or capability you are missing
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The situation, not the solution. Which agent system, what kind of skill, where the framework gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried
+      description: e.g. the `command` or `http` adapter, a `script` judge, a project-local plugin.

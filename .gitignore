@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# skillloop project state and generated outputs (inputs of the examples are tracked, results are not)
+.skillloop/
+examples/*/outputs/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Local agent tooling
+.claude/settings.local.json

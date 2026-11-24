@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skillloop"
+dynamic = ["version"]
+description = "A closed-loop framework for evolving agent skills (SKILL.md): evaluate, judge, learn from failures, compare versions, promote the best. Plugs into any agent system."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "skillloop contributors" }]
+keywords = ["agent", "skills", "llm", "evaluation", "prompt-optimization", "mcp", "claude-code"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Testing",
+    "Typing :: Typed",
+]
+dependencies = []  # the core runs on the standard library alone
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40"]
+dev = ["pytest>=8", "ruff>=0.6", "build>=1.2"]
+
+[project.urls]
+Repository = "https://github.com/dozycat/skillloop"
+Issues = "https://github.com/dozycat/skillloop/issues"
+Changelog = "https://github.com/dozycat/skillloop/blob/main/CHANGELOG.md"
+
+[project.scripts]
+skillloop = "skillloop.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "skillloop.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+skillloop = ["py.typed", "web/static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src", "tests"]
+extend-exclude = ["examples/*/outputs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+    "E501",  # long lines are left to the formatter; prompts and messages may exceed the limit
+    "B905",  # zip() without strict= : lengths are equal by construction where used
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/skillloop/__init__.py" = ["E402"]
+"tests/*" = ["B018", "E741"]

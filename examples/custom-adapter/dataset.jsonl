@@ -1,0 +1,24 @@
+{"id": "sla-1", "input": "What does our team mean by SLA?", "expected": "Service Level Agreement", "tags": ["sla"], "meta": {"hints": {"sla": "Service Level Agreement"}}}
+{"id": "sla-2", "input": "Expand the abbreviation SLA", "expected": "Service Level Agreement", "tags": ["sla"], "meta": {"hints": {"sla": "Service Level Agreement"}}}
+{"id": "sla-3", "input": "In our docs, what is SLA?", "expected": "Service Level Agreement", "tags": ["sla"], "meta": {"hints": {"sla": "Service Level Agreement"}}}
+{"id": "sla-4", "input": "Spell out SLA", "expected": "Service Level Agreement", "tags": ["sla"], "meta": {"hints": {"sla": "Service Level Agreement"}}}
+{"id": "rca-1", "input": "What does our team mean by RCA?", "expected": "Root Cause Analysis", "tags": ["rca"], "meta": {"hints": {"rca": "Root Cause Analysis"}}}
+{"id": "rca-2", "input": "Expand the abbreviation RCA", "expected": "Root Cause Analysis", "tags": ["rca"], "meta": {"hints": {"rca": "Root Cause Analysis"}}}
+{"id": "rca-3", "input": "In our docs, what is RCA?", "expected": "Root Cause Analysis", "tags": ["rca"], "meta": {"hints": {"rca": "Root Cause Analysis"}}}
+{"id": "rca-4", "input": "Spell out RCA", "expected": "Root Cause Analysis", "tags": ["rca"], "meta": {"hints": {"rca": "Root Cause Analysis"}}}
+{"id": "mttr-1", "input": "What does our team mean by MTTR?", "expected": "Mean Time To Recovery", "tags": ["mttr"], "meta": {"hints": {"mttr": "Mean Time To Recovery"}}}
+{"id": "mttr-2", "input": "Expand the abbreviation MTTR", "expected": "Mean Time To Recovery", "tags": ["mttr"], "meta": {"hints": {"mttr": "Mean Time To Recovery"}}}
+{"id": "mttr-3", "input": "In our docs, what is MTTR?", "expected": "Mean Time To Recovery", "tags": ["mttr"], "meta": {"hints": {"mttr": "Mean Time To Recovery"}}}
+{"id": "mttr-4", "input": "Spell out MTTR", "expected": "Mean Time To Recovery", "tags": ["mttr"], "meta": {"hints": {"mttr": "Mean Time To Recovery"}}}
+{"id": "slo-1", "input": "What does our team mean by SLO?", "expected": "Service Level Objective", "tags": ["slo"], "meta": {"hints": {"slo": "Service Level Objective"}}}
+{"id": "slo-2", "input": "Expand the abbreviation SLO", "expected": "Service Level Objective", "tags": ["slo"], "meta": {"hints": {"slo": "Service Level Objective"}}}
+{"id": "slo-3", "input": "In our docs, what is SLO?", "expected": "Service Level Objective", "tags": ["slo"], "meta": {"hints": {"slo": "Service Level Objective"}}}
+{"id": "slo-4", "input": "Spell out SLO", "expected": "Service Level Objective", "tags": ["slo"], "meta": {"hints": {"slo": "Service Level Objective"}}}
+{"id": "poc-1", "input": "What does our team mean by POC?", "expected": "Proof Of Concept", "tags": ["poc"], "meta": {"hints": {"poc": "Proof Of Concept"}}}
+{"id": "poc-2", "input": "Expand the abbreviation POC", "expected": "Proof Of Concept", "tags": ["poc"], "meta": {"hints": {"poc": "Proof Of Concept"}}}
+{"id": "poc-3", "input": "In our docs, what is POC?", "expected": "Proof Of Concept", "tags": ["poc"], "meta": {"hints": {"poc": "Proof Of Concept"}}}
+{"id": "poc-4", "input": "Spell out POC", "expected": "Proof Of Concept", "tags": ["poc"], "meta": {"hints": {"poc": "Proof Of Concept"}}}
+{"id": "okr-1", "input": "What does our team mean by OKR?", "expected": "Objectives And Key Results", "tags": ["okr"], "meta": {"hints": {"okr": "Objectives And Key Results"}}}
+{"id": "okr-2", "input": "Expand the abbreviation OKR", "expected": "Objectives And Key Results", "tags": ["okr"], "meta": {"hints": {"okr": "Objectives And Key Results"}}}
+{"id": "okr-3", "input": "In our docs, what is OKR?", "expected": "Objectives And Key Results", "tags": ["okr"], "meta": {"hints": {"okr": "Objectives And Key Results"}}}
+{"id": "okr-4", "input": "Spell out OKR", "expected": "Objectives And Key Results", "tags": ["okr"], "meta": {"hints": {"okr": "Objectives And Key Results"}}}

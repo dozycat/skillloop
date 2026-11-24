@@ -1,0 +1,36 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, what you got. Paste the exact error.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: >
+        The smallest project that shows it. If it reproduces with the offline demo
+        (`skillloop init demo --demo`), say so - that is the fastest path to a fix.
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Agent adapter / LLM provider / judge
+      placeholder: "claude_code / anthropic / llm   (see `skillloop status`)"
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: "skillloop 0.1.0, Python 3.12, macOS 15"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: "`skillloop logs -p <project>` - remove anything private (prompts, dataset content, keys)."
+      render: text

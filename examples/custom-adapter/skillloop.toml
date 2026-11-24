@@ -1,0 +1,29 @@
+# Example: a project that ships its own agent adapter (my_agent.py) next to this file.
+# Runs offline:  skillloop evolve -p examples/custom-adapter
+[project]
+name = "custom-adapter"
+plugins = ["my_agent"]          # imported at startup; registers the "glossary_agent" adapter
+
+[agent]
+adapter = "glossary_agent"
+
+[agent.options]
+unknown_reply = "I do not know this abbreviation."
+
+[llm]
+provider = "mock"               # simulated analyst, so no API key is needed for this example
+
+[llm.options]
+max_fixes_per_call = 1
+
+[eval]
+judge = "exact"
+
+[evolve]
+train_ratio = 0.5
+val_ratio = 0.25
+analyst_batch_size = 3
+max_failures_per_iteration = 6
+# A glossary skill legitimately contains the answers (the expansions), so the answer-leakage guard
+# would reject every useful edit. Keep it on (the default) for skills that should teach a procedure.
+leak_check = false
